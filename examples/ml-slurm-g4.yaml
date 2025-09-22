@@ -1,0 +1,144 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+blueprint_name: ml-slurm-g4
+
+vars:
+  project_id: ## Set GCP Project ID Here ##
+  deployment_name: ## Set Deployment Name Here ##
+  region: ## Set GCP Region Here ##
+  zone: ## Set GCP Zone ID Here ##
+  net0_range: 192.168.0.0/19
+  filestore_ip_range: 192.168.32.0/24
+  net1_range: 192.168.64.0/18
+  new_image:
+    family: slurm-gcp-6-11-ubuntu-2204-lts-nvidia-570
+    project: schedmd-slurm-public
+    disk_size_gb: 100
+
+deployment_groups:
+- group: cluster-env
+  modules:
+  - id: net0
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.deployment_name)-net-0
+      mtu: 8896
+      subnetworks:
+      - subnet_name: $(vars.deployment_name)-sub-0
+        subnet_region: $(vars.region)
+        subnet_ip: $(vars.net0_range)
+       
+
+  - id: net1
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.deployment_name)-net-1
+      mtu: 8896
+      subnetworks:
+      - subnet_name: $(vars.deployment_name)-sub-1
+        subnet_region: $(vars.region)
+        subnet_ip: $(vars.net1_range)
+
+  - id: homefs
+    source: modules/file-system/filestore
+    use:
+    - net0
+    settings:
+      filestore_tier: HIGH_SCALE_SSD
+      size_gb: 10240
+      local_mount: /home
+      reserved_ip_range: $(vars.filestore_ip_range)
+      deletion_protection:
+        enabled: true
+        reason: Avoid data loss
+    outputs:
+    - network_storage
+  
+  # - id: private_service_access
+  #   source: community/modules/network/private-service-access
+  #   use: [net0]
+
+  # To use Managed Lustre as for the shared /home directory:
+  # 1. Comment out the filestore block above and the `filestore_ip_range` line in the vars block.
+  # 2. Uncomment the managed-lustre and private-service-access blocks.
+  # 3. Ensure the instance_image being used has the Lustre client installed.
+  # - id: homefs
+  #   source: modules/file-system/managed-lustre
+  #   use:
+  #   - net0
+  #   - private_service_access
+  #   settings:
+  #     size_gib: 18000
+  #     name: lustre-instance1
+  #     local_mount: /home
+  #     remote_mount: lustrefs
+  #     outputs:
+  #     - network_storage
+
+- group: cluster
+  modules:
+  - id: g4_nodeset
+    source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
+    settings:
+      subnetwork_self_link: $(net0.subnetwork_self_link)
+      node_count_dynamic_max: 0
+      enable_placement: false
+      node_count_static: 1
+      bandwidth_tier: gvnic_enabled
+      machine_type: g4-standard-48
+      disk_type: hyperdisk-balanced
+      instance_image: $(vars.new_image)
+      instance_image_custom: true
+      additional_networks:
+      - network: $(net1.network_self_link) 
+        subnetwork: $(net1.subnetwork_self_link)
+        subnetwork_project: $(vars.project_id)
+        nic_type: "GVNIC"
+        queue_count: null
+        network_ip: ""
+        stack_type: null
+        access_config: []
+        ipv6_access_config: []
+        alias_ip_range: []
+        
+  - id: g4_partition
+    source: community/modules/compute/schedmd-slurm-gcp-v6-partition
+    use: [g4_nodeset]
+    settings:
+      partition_name: g4
+      exclusive: false
+
+  - id: slurm_login
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-login
+    use: [net0]
+    settings:
+      machine_type: c2-standard-4
+      enable_login_public_ips: true
+      instance_image_custom: true
+
+  - id: slurm_controller
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+    use:
+    - net0
+    - g4_partition
+    - slurm_login
+    - homefs
+    settings:
+      machine_type: c2-standard-4
+      endpoint_versions:
+      enable_controller_public_ips: true
+      instance_image_custom: true
