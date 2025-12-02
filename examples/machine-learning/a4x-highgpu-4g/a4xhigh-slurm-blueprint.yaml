@@ -17,7 +17,7 @@
 blueprint_name: a4xhigh-slurm
 
 vars:
-  deployment_name: ## Deployment name ##
+  deployment_name: ## Deployment name  ##
   project_id: ## Project name ##
   region: ## A4X Reservation Region ##
   zone: ## A4X Reservation Zone ##
