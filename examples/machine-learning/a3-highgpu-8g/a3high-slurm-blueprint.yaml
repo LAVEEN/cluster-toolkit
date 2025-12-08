@@ -16,10 +16,10 @@ blueprint_name: a3high-slurm
 
 vars:
   sys_net_range: 172.16.0.0/16
-  filestore_ip_range: 192.168.0.0/29
+  #filestore_ip_range: 192.168.0.0/29
   source_image_project_id: ubuntu-os-cloud
   source_image_family: ubuntu-2204-lts
-  local_mount_homefs: /home
+  #local_mount_homefs: /home
   instance_image:
     project: $(vars.project_id)
     family: $(vars.deployment_name)-tcpx-image
@@ -27,7 +27,7 @@ vars:
   enable_nvidia_dcgm: true
   disk_size_gb: 200
   #Provisioning models (set to true or fill in reservation name, pick only one)
-  a3_reservation_name: "" # supply reservation name
+  #a3_reservation_name: "" # supply reservation name
   a3_dws_flex_enabled: false
   a3_enable_spot_vm: false
 
@@ -57,15 +57,15 @@ deployment_groups:
       network_count: 4
       subnetwork_cidr_suffix: 20
 
-  - id: homefs
-    source: modules/file-system/filestore
-    use:
-    - sysnet
-    settings:
-      filestore_tier: BASIC_SSD
-      size_gb: 2560
-      reserved_ip_range: $(vars.filestore_ip_range)
-      local_mount: $(vars.local_mount_homefs)
+  # - id: homefs
+  #   source: modules/file-system/filestore
+  #   use:
+  #   - sysnet
+  #   settings:
+  #     filestore_tier: BASIC_SSD
+  #     size_gb: 2560
+  #     reserved_ip_range: $(vars.filestore_ip_range)
+  #     local_mount: $(vars.local_mount_homefs)
 
 - group: build-script
   modules:
@@ -557,7 +557,7 @@ deployment_groups:
     - compute_sa
     - a3_startup
     settings:
-      reservation_name: $(vars.a3_reservation_name)
+      reservation_name: a3-reservation-0
       enable_spot_vm: $(vars.a3_enable_spot_vm)
       dws_flex:
         enabled: $(vars.a3_dws_flex_enabled)
@@ -637,7 +637,7 @@ deployment_groups:
     - sysnet
     - a3_partition
     - slurm_login
-    - homefs
+    #- homefs
     settings:
       cloud_parameters:
         resume_rate: 0

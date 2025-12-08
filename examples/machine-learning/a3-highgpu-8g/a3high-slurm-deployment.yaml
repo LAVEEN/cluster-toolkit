@@ -16,20 +16,20 @@
 terraform_backend_defaults:
   type: gcs
   configuration:
-    bucket: # supply bucket to store Terraform state
+    bucket: lav-tf-bucket # supply bucket to store Terraform state
 
 vars:
-  deployment_name: # supply unique deployment name
-  project_id: # supply existing project id
-  region: # supply region with a3-highgpu-8g capacity in reservation
-  zone: # supply zone with a3-highgpu-8g capacity in reservation
-  tcpx_kernel_login: # use value supplied by Google Cloud staff
-  tcpx_kernel_password: # use value supplied by Google Cloud staff
-  keyserver_ubuntu_key: # use value supplied by Google Cloud staff
-  a3_reservation_name: # supply a3-highgpu-8g reservation name
-  slurm_cluster_name: # supply name for slurm cluster
-  a3_static_cluster_size: # supply a3-highgpu-8g reservation size
-  a3_partition_name: # supply partition name
+  deployment_name: a3high # supply unique deployment name
+  project_id: hpc-toolkit-dev # supply existing project id
+  region: us-west1 # supply region with a3-highgpu-8g capacity in reservation
+  zone: us-west1-a # supply zone with a3-highgpu-8g capacity in reservation
+  tcpx_kernel_login: linux-gcp-tcpx-google # use value supplied by Google Cloud staff
+  tcpx_kernel_password: DLwDV5bCpCPqCRlvg8td # use value supplied by Google Cloud staff
+  keyserver_ubuntu_key: 3DD6E9491BB719B4 # use value supplied by Google Cloud staff
+  #a3_reservation_name: # supply a3-highgpu-8g reservation name
+  slurm_cluster_name: a3h # supply name for slurm cluster
+  a3_static_cluster_size: 2 # supply a3-highgpu-8g reservation size
+  a3_partition_name: a3hp # supply partition name
   disk_size_gb: 200
   # Additional provisioning models (pick only one), can be used to substitute `a3_reservation_name`:
   #
