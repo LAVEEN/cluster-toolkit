@@ -1,31 +1,36 @@
 #!/bin/bash
-# Copyright 2026 "Google LLC"
 set -e
 
-TRIGGER_BUILD_CONFIG_PATH="$1"
+# Assign values
+TRIGGER_BUILD_CONFIG_PATH="${1:?Error: TRIGGER_BUILD_CONFIG_PATH argument is required}"
+PREFIX="${_TEST_PREFIX:-}"
 
-# We use [[ ]] for string pattern matching. 
-if [[ "$TRIGGER_BUILD_CONFIG_PATH" == *"onspot"* ]] && [[ "${_TEST_PREFIX}" == "pr-" ]]; then
-    echo "DEBUG: 'onspot' PR test detected (Path: $TRIGGER_BUILD_CONFIG_PATH, Prefix: $_TEST_PREFIX)."
-    echo "DEBUG: Skipping ongoing build check and returning success."
+# Echo the assigned values immediately for logging
+echo "--------------------------------------------------------"
+echo "VARIABLE ASSIGNMENT:"
+echo "TRIGGER_BUILD_CONFIG_PATH: $TRIGGER_BUILD_CONFIG_PATH"
+echo "PREFIX (from _TEST_PREFIX): $PREFIX"
+echo "--------------------------------------------------------"
+
+# 1. Skip logic for 'onspot' PR tests
+if [[ "$TRIGGER_BUILD_CONFIG_PATH" == *"onspot"* ]] && [[ "$PREFIX" == "pr-" ]]; then
+    echo "MATCH DETECTED: 'onspot' config with 'pr-' prefix."
+    echo "ACTION: Skipping ongoing build check."
     exit 0
 fi
 
-echo "DEBUG: Proceeding with check for running builds..."
+echo "DEBUG: No skip condition met. Proceeding with running build check..."
 
-# 2. Existing logic to check for other running builds
-echo "DEBUG: Checking for running builds matching trigger: $TRIGGER_BUILD_CONFIG_PATH"
+# 2. Check for other running builds
+# We use single quotes inside the filter string to satisfy gcloud's parser
+MATCHING_BUILDS=$(gcloud builds list --ongoing \
+    --format='value(id)' \
+    --filter="substitutions.TRIGGER_BUILD_CONFIG_PATH = '$TRIGGER_BUILD_CONFIG_PATH' AND id != '$BUILD_ID'")
 
-# Filter out the current build ID to avoid a self-match (optional but cleaner)
-# The current Build ID is available via the default $BUILD_ID variable
-MATCHING_BUILDS=$(gcloud builds list --ongoing --format 'value(id)' \
-    --filter="substitutions.TRIGGER_BUILD_CONFIG_PATH=\"$TRIGGER_BUILD_CONFIG_PATH\" AND id != \"$BUILD_ID\"")
-
-# Check if the result is empty
 if [ -n "$MATCHING_BUILDS" ]; then
-        echo "Error: Found other running build(s) for this config:"
-        echo "$MATCHING_BUILDS"
-        exit 1
+    echo "ERROR: Found other running build(s) for this config:"
+    echo "$MATCHING_BUILDS"
+    exit 1
 fi
 
-echo "No other matching running builds found."
+echo "SUCCESS: No other matching builds found."
