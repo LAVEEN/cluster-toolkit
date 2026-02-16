@@ -4,10 +4,12 @@
 set -e
 
 TRIGGER_BUILD_CONFIG_PATH="$1"
+echo "DEBUG: _TEST_PREFIX is '${_TEST_PREFIX}'"
 
 # Define Boolean: True if _TEST_PREFIX is "daily-", False if empty (PR test)
 IS_DAILY=false
 [[ "${_TEST_PREFIX}" == "daily-" ]] && IS_DAILY=true
+
 
 echo "Config: $TRIGGER_BUILD_CONFIG_PATH | Daily: $IS_DAILY"
 
