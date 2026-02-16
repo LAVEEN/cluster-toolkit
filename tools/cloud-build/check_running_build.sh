@@ -4,39 +4,33 @@
 set -e
 
 TRIGGER_BUILD_CONFIG_PATH="$1"
-TEST_PREFIX="$2"  # Expected: "pr-" or "daily-"
 
-echo "Config Path: $TRIGGER_BUILD_CONFIG_PATH"
-echo "Test Prefix: $TEST_PREFIX"
+# Define Boolean: True if _TEST_PREFIX is "daily-", False if empty (PR test)
+IS_DAILY=false
+[[ "${_TEST_PREFIX}" == "daily-" ]] && IS_DAILY=true
 
-# We filter by BOTH the config path AND the specific test prefix 
-# to ensure Daily and PR tests don't count against each other.
-MATCHING_BUILDS=$(gcloud builds list --ongoing --format 'value(id)' \
-  --filter="substitutions.TRIGGER_BUILD_CONFIG_PATH=\"$TRIGGER_BUILD_CONFIG_PATH\" AND substitutions._TEST_PREFIX=\"$TEST_PREFIX\"")
+echo "Config: $TRIGGER_BUILD_CONFIG_PATH | Daily: $IS_DAILY"
 
+# Fetch matching ongoing builds for this config path
+MATCHING_BUILDS=$(gcloud builds list --ongoing --format 'value(id)' --filter="substitutions.TRIGGER_BUILD_CONFIG_PATH=\"$TRIGGER_BUILD_CONFIG_PATH\"")
 MATCHING_COUNT=$(echo "$MATCHING_BUILDS" | wc -w)
 
 if [ "$MATCHING_COUNT" -gt 1 ]; then
   
-  # CASE 1: PR Test on 'onspot' - Allow multiple
-  if [[ "$TEST_PREFIX" == "pr-" && "$TRIGGER_BUILD_CONFIG_PATH" == *"onspot"* ]]; then
-    echo "Found $MATCHING_COUNT matching PR builds. Allowing multiple for 'onspot' configuration."
+  # Logic: 
+  # If it's a PR test (NOT daily) AND it's an 'onspot' build, we allow more than one.
+  if [ "$IS_DAILY" = false ] && [[ "$TRIGGER_BUILD_CONFIG_PATH" == *"onspot"* ]]; then
+    echo "Found $MATCHING_COUNT matching builds. Allowing multiple as this is an 'onspot' PR test."
     echo "$MATCHING_BUILDS"
     exit 0
   fi
 
-  # CASE 2: Daily Test - Strictly only one allowed
-  if [[ "$TEST_PREFIX" == "daily-" ]]; then
-    echo "Error: A daily test is already running for this config. Only 1 allowed."
-  else
-    # This covers PR tests that are NOT 'onspot'
-    echo "Error: Multiple matching builds found for $TEST_PREFIX ($TRIGGER_BUILD_CONFIG_PATH)."
-  fi
-
-  echo "Matching Build IDs:"
-  echo "$MATCHING_BUILDS"
+  # Otherwise, block the build (Strictly 1 for Daily tests or non-onspot PRs)
+  echo "Error: Multiple matching builds detected."
+  echo "Daily Test: $IS_DAILY"
+  echo "Matching Build IDs: $MATCHING_BUILDS"
   exit 1
 fi
 
-echo "Check passed: No conflicting $TEST_PREFIX builds found."
+echo "Check passed: No conflicting builds found."
 exit 0
