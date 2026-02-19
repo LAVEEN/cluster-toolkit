@@ -35,8 +35,10 @@ steps:
 # While using static network names we are gaurding against more than 1 instance running at a time (for multi-group tests)
 - id: check_for_running_build
   name: gcr.io/cloud-builders/gcloud
-  script: |
-    #!/usr/bin/env bash
+  args:
+  - -c
+  - |
+    set -e -u -o pipefail
     echo "${_TEST_PREFIX}"
     echo "$${_TEST_PREFIX}"
     tools/cloud-build/check_running_build.sh \
