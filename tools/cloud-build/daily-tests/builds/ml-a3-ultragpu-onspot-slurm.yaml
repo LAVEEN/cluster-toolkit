@@ -37,6 +37,8 @@ steps:
   name: gcr.io/cloud-builders/gcloud
   script: |
     #!/usr/bin/env bash
+    echo "${_TEST_PREFIX}"
+    echo "$${_TEST_PREFIX}"
     tools/cloud-build/check_running_build.sh \
       "tools/cloud-build/daily-tests/builds/ml-a3-ultragpu-onspot-slurm.yaml" \
       "${_TEST_PREFIX}"
