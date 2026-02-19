@@ -35,12 +35,13 @@ steps:
 # While using static network names we are gaurding against more than 1 instance running at a time (for multi-group tests)
 - id: check_for_running_build
   name: gcr.io/cloud-builders/gcloud
+  entrypoint: 'bash'  # Specify bash as the entrypoint
   args:
   - -c
   - |
     set -e -u -o pipefail
-    echo "${_TEST_PREFIX}"
-    echo "$${_TEST_PREFIX}"
+    echo "Using _TEST_PREFIX: ${_TEST_PREFIX}"
+    echo "Using $$_TEST_PREFIX: $${_TEST_PREFIX}"
     tools/cloud-build/check_running_build.sh \
       "tools/cloud-build/daily-tests/builds/ml-a3-ultragpu-onspot-slurm.yaml" \
       "${_TEST_PREFIX}"
