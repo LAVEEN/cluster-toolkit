@@ -41,7 +41,6 @@ steps:
   - |
     set -e -u -o pipefail
     echo "Using _TEST_PREFIX: ${_TEST_PREFIX}"
-    echo "Using $$_TEST_PREFIX: $${_TEST_PREFIX}"
     tools/cloud-build/check_running_build.sh \
       "tools/cloud-build/daily-tests/builds/ml-a3-ultragpu-onspot-slurm.yaml" \
       "${_TEST_PREFIX}"
