@@ -16,9 +16,14 @@
 
 blueprint_name: h4d-cluster
 
+
+terraform_providers:
+  google:
+    source: hashicorp/google-private
+    version: "0.0.2518"  # Or the specific version containing your feature
 vars:
-  project_id: ## Set GCP Project ID Here ##
-  deployment_name: h4d-cluster
+  project_id: gsc-foundations-qual-h4d ## Set GCP Project ID Here ##
+  deployment_name: lochinttest
   region: us-central1
   zone: us-central1-a
   rdma_net_range: 192.168.32.0/24
@@ -57,13 +62,6 @@ deployment_groups:
         subnet_ip: $(vars.rdma_net_range)
         region: $(vars.region)
 
-  - id: homefs
-    source: modules/file-system/filestore
-    use: [cluster-net-0]
-    settings:
-      local_mount: /home
-    outputs:
-    - network_storage
 
   - id: h4d_startup
     source: modules/scripts/startup-script
@@ -79,13 +77,14 @@ deployment_groups:
 
   - id: h4d-vms
     source: modules/compute/vm-instance
-    use: [h4d_startup, homefs]
+    use: [h4d_startup]
     settings:
       machine_type: h4d-highmem-192-lssd
       instance_count: 2
       disk_type: hyperdisk-balanced
       on_host_maintenance: TERMINATE
       reservation_name: $(vars.reservation_name)
+      location_hint: "cluster-yucbfac.cl-yucbfac-17309552279774271149"
       network_interfaces:
         $(concat(
           [{
