@@ -17,6 +17,7 @@
 package modulewriter
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/ext/typeexpr"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
@@ -290,6 +292,11 @@ func (w TFWriter) writeGroup(
 		return fmt.Errorf("error writing versions.tf file for deployment group %s: %v", g.Name, err)
 	}
 
+	// Patch extracted embedded modules versions.tf files
+	if err := patchEmbeddedModulesVersionsTf(g.Modules, groupPath, tp); err != nil {
+		return fmt.Errorf("error patching embedded modules versions.tf for deployment group %s: %v", g.Name, err)
+	}
+
 	multiGroupDeployment := len(bp.Groups) > 1
 	printImportInputs := multiGroupDeployment && groupIndex > 0
 	printExportOutputs := multiGroupDeployment && groupIndex < len(bp.Groups)-1
@@ -410,6 +417,67 @@ func FindIntergroupVariables(group config.Group, bp config.Blueprint) map[config
 		}
 	}
 	return res
+}
+
+func patchEmbeddedModulesVersionsTf(modules []config.Module, groupPath string, providers map[string]config.TerraformProvider) error {
+	for _, mod := range modules {
+		if mod.Kind != config.TerraformKind {
+			continue
+		}
+		ds, err := DeploymentSource(mod)
+		if err != nil {
+			return err
+		}
+
+		modDir := filepath.Join(groupPath, ds)
+		vtfPath := filepath.Join(modDir, "versions.tf")
+		b, err := os.ReadFile(vtfPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+
+		f, diags := hclwrite.ParseConfig(b, vtfPath, hcl.Pos{Line: 1, Column: 1})
+		if diags.HasErrors() {
+			return fmt.Errorf("error parsing %s: %s", vtfPath, diags.Error())
+		}
+
+		tfBlock := f.Body().FirstMatchingBlock("terraform", nil)
+		if tfBlock == nil {
+			continue
+		}
+		rpBlock := tfBlock.Body().FirstMatchingBlock("required_providers", nil)
+		if rpBlock == nil {
+			continue
+		}
+
+		modified := false
+		for name, prov := range providers {
+			if prov.Source == "" {
+				continue
+			}
+			attr := rpBlock.Body().GetAttribute(name)
+			if attr != nil {
+				objMap := map[string]cty.Value{
+					"source": cty.StringVal(prov.Source),
+				}
+				if prov.Version != "" {
+					objMap["version"] = cty.StringVal(prov.Version)
+				}
+				rpBlock.Body().SetAttributeValue(name, cty.ObjectVal(objMap))
+				modified = true
+			}
+		}
+
+		if modified {
+			if err := writeHclFile(vtfPath, f); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (w TFWriter) kind() config.ModuleKind {

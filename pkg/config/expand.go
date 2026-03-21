@@ -208,17 +208,47 @@ func getDefaultGoogleProviders(bp Blueprint) map[string]TerraformProvider {
 }
 
 func (bp Blueprint) expandProviders(grp *Group) {
-	// 1. DEFAULT: use TerraformProviders provider dictionary (if supplied)
-	// 2. If top-level TerraformProviders is defined, insert that
-	//    provider dictionary into resource groups which have no explicit
-	//    TerraformProviders
-	defaults := bp.TerraformProviders
-	pv := &grp.TerraformProviders
-	if defaults == nil {
-		defaults = getDefaultGoogleProviders(bp)
+	// 1. Get default providers with configuration (project, region, zone)
+	defaults := getDefaultGoogleProviders(bp)
+
+	// 2. Merge blueprint-level providers into defaults
+	if bp.TerraformProviders != nil {
+		for name, pUser := range bp.TerraformProviders {
+			pDef := defaults[name]
+			if pUser.Source != "" {
+				pDef.Source = pUser.Source
+			}
+			if pUser.Version != "" {
+				pDef.Version = pUser.Version
+			}
+			for _, k := range pUser.Configuration.Keys() {
+				pDef.Configuration = pDef.Configuration.With(k, pUser.Configuration.Get(k))
+			}
+			defaults[name] = pDef
+		}
 	}
-	if (*pv) == nil {
-		(*pv) = maps.Clone(defaults)
+
+	// 3. Apply to deployment group or merge group-level providers
+	pv := &grp.TerraformProviders
+	if *pv == nil {
+		*pv = maps.Clone(defaults)
+	} else if len(*pv) == 0 {
+		// explicit empty map should remain empty (per tests)
+	} else {
+		for name, pGrp := range *pv {
+			pDef := defaults[name]
+			if pGrp.Source != "" {
+				pDef.Source = pGrp.Source
+			}
+			if pGrp.Version != "" {
+				pDef.Version = pGrp.Version
+			}
+			for _, k := range pGrp.Configuration.Keys() {
+				pDef.Configuration = pDef.Configuration.With(k, pGrp.Configuration.Get(k))
+			}
+			defaults[name] = pDef
+		}
+		*pv = maps.Clone(defaults)
 	}
 }
 
