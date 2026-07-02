@@ -18,15 +18,15 @@
   become: true
   ansible.builtin.service_facts:
 
-- name: Fail if Google Cloud Ops Agent is not running
-  ansible.builtin.debug:
-    var: ansible_facts.services
+- name: Set ops agent service name
+  ansible.builtin.set_fact:
+    ops_agent_service: "{{ 'google-cloud-ops-agent.service' if 'google-cloud-ops-agent.service' in ansible_facts.services else 'google-cloud-ops-agent' }}"
 
 - name: Fail if Google Cloud Ops Agent is not running
   ansible.builtin.assert:
     that:
-    - ansible_facts.services["google-cloud-ops-agent"].status == "enabled"
-    - ansible_facts.services["google-cloud-ops-agent"].state == "running"
+    - ansible_facts.services[ops_agent_service].status == "enabled"
+    - ansible_facts.services[ops_agent_service].state == "running"
 
 - name: Check that monitoring dashboard has been created
   changed_when: false

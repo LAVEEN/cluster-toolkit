@@ -97,6 +97,7 @@ handle_redhat() {
 
 	install_opsagent() {
 		curl -s "${OPSAGENT_SCRIPT_URL}" | bash -s -- --also-install
+		systemctl start google-cloud-ops-agent
 	}
 
 	install_stackdriver_agent() {
