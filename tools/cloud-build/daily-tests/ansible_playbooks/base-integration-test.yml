@@ -219,6 +219,17 @@
       - name: Check for recent preemptions
         ansible.builtin.include_tasks: test-validation/test-preemption.yml
 
+    - name: Print startup script logs from journalctl
+      become: true
+      ansible.builtin.command: journalctl -u google-startup-scripts.service --no-pager
+      register: startup_logs
+      failed_when: false
+
+    - name: Display startup script logs
+      ansible.builtin.debug:
+        var: startup_logs.stdout_lines
+      failed_when: false
+
     - name: Propagate original failure after rescue tasks
       ansible.builtin.fail:
         msg: "Integration tests failed. Rescue tasks were executed."
