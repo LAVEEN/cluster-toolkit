@@ -230,6 +230,28 @@
         var: startup_logs.stdout_lines
       failed_when: false
 
+    - name: Print ops agent status
+      become: true
+      ansible.builtin.command: systemctl status google-cloud-ops-agent.service
+      register: ops_agent_status
+      failed_when: false
+
+    - name: Display ops agent status
+      ansible.builtin.debug:
+        var: ops_agent_status.stdout_lines
+      failed_when: false
+
+    - name: Print ops agent logs
+      become: true
+      ansible.builtin.command: journalctl -u google-cloud-ops-agent.service --no-pager -n 50
+      register: ops_agent_logs
+      failed_when: false
+
+    - name: Display ops agent logs
+      ansible.builtin.debug:
+        var: ops_agent_logs.stdout_lines
+      failed_when: false
+
     - name: Propagate original failure after rescue tasks
       ansible.builtin.fail:
         msg: "Integration tests failed. Rescue tasks were executed."
