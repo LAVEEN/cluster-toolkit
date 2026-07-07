@@ -71,6 +71,87 @@ deployment_groups:
       reserved_ip_range: $(vars.filestore_ip_range)
       local_mount: $(vars.local_mount_homefs)
 
+  # The following four modules create and mount a Cloud Storage Bucket with
+  # gcsfuse.  They are optional but recommended for many use cases.
+  # (Optional) The following creates a GCS bucket that will be mounted
+  # using gcsfuse. If you prefer to use a pre-existing bucket, use the
+  # modules/file-system/pre-existing-network-storage module.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  - id: gcs_bucket
+    source: modules/file-system/cloud-storage-bucket
+    settings:
+      enable_hierarchical_namespace: true
+      local_mount: /gcs
+      random_suffix: true
+      mount_options: "implicit_dirs,\
+                      metadata_cache_negative_ttl_secs=0,\
+                      metadata_cache_ttl_secs=-1,\
+                      stat_cache_max_size_mb=-1,\
+                      type_cache_max_size_mb=-1,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for checkpoint writing/reading Uses
+  # local-ssd for and enables parallel downloads.  For more information on
+  # these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_checkpoints
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-checkpoints
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-checkpointing,\
+                      cache_dir=/mnt/localssd,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for reading training data.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # If your training dataset fits on localssd, then you may want to enable file
+  # cache as well, which is done by adding
+  # cache-dir=/mnt/localssd,\
+  # file-cache-max-size-mb=<DATASET_SIZE>,\
+  # file-cache-cache-file-for-range-read=true,\
+  # to the mount_options.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_training_data
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-training-data
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-training,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for model serving.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_model_serving
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-model-serving
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-serving,\
+                      cache_dir=/mnt/localssd,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
 - group: build-script
   modules:
   - id: image_build_script
@@ -191,10 +272,10 @@ deployment_groups:
               package_filename: /tmp/{{ package_url | basename }}
               nvidia_packages:
               - cuda-toolkit-12-8
-              - nvidia-dkms-570-server-open
-              - nvidia-driver-570-server-open
-              - datacenter-gpu-manager
-              - libnvidia-nscq-570
+              - nvidia-dkms-580-server-open
+              - nvidia-driver-580-server-open
+              - datacenter-gpu-manager-4-cuda13
+              - libnvidia-nscq-580
               - nvidia-container-toolkit
             tasks:
             - name: Download NVIDIA repository package
@@ -508,6 +589,12 @@ deployment_groups:
             "data-root": "$(vars.localssd_mountpoint)/docker"
           }
       runners:
+      - $(gcs_checkpoints.client_install_runner)
+      - $(gcs_checkpoints.mount_runner)
+      - $(gcs_training_data.client_install_runner)
+      - $(gcs_training_data.mount_runner)
+      - $(gcs_model_serving.client_install_runner)
+      - $(gcs_model_serving.mount_runner)
       - type: ansible-local
         destination: enable_nvidia_dcgm.yml
         content: |
@@ -642,6 +729,7 @@ deployment_groups:
     - a3_partition
     - slurm_login
     - homefs
+    - gcs_bucket
     settings:
       cloud_parameters:
         resume_rate: 0
