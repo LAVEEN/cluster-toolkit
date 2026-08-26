@@ -3,6 +3,7 @@
 The directories below contain solutions for provisioning Slurm clusters using
 the latest VM families from Google Cloud
 
+- [A3 Edge](a3-edgegpu-8g)
 - [A3 High](a3-highgpu-8g)
 - [A3 Mega](a3-megagpu-8g)
 - [A3 Ultra](a3-ultragpu-8g)
